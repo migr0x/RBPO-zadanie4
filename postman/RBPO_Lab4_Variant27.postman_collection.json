@@ -1,0 +1,2626 @@
+{
+  "info": {
+    "_postman_id": "9bcb88a1-4fb4-4a7e-980a-7c9c51e8b127",
+    "name": "RBPO — Лабораторная работа №4, вариант 27",
+    "description": "Коллекция для лабораторной работы №4. Сначала выполните получение CSRF-токена, затем регистрацию и запросы под редактором или журналистом. Для небезопасных методов используется заголовок X-CSRF-TOKEN. Демо-учётные записи: chief_editor / EditorDemo!2026 и journalist_ivan / JournalistDemo!2026.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "sectionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deleteSectionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deleteUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "articleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "revisionArticleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deleteArticleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "issueId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "deleteIssueId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "editorUsername",
+      "value": "chief_editor",
+      "type": "string"
+    },
+    {
+      "key": "editorPassword",
+      "value": "EditorDemo!2026",
+      "type": "string"
+    },
+    {
+      "key": "journalistUsername",
+      "value": "journalist_ivan",
+      "type": "string"
+    },
+    {
+      "key": "journalistPassword",
+      "value": "JournalistDemo!2026",
+      "type": "string"
+    },
+    {
+      "key": "csrfToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationUsername",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationPassword",
+      "value": "Registered!Pass2026",
+      "type": "string"
+    },
+    {
+      "key": "userPassword",
+      "value": "PostmanReporter!2026",
+      "type": "string"
+    },
+    {
+      "key": "registeredUserId",
+      "value": ""
+    },
+    {
+      "key": "registeredArticleId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 — Аутентификация, регистрация и CSRF",
+      "item": [
+        {
+          "name": "01 Получить CSRF-токен",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/csrf",
+            "description": "Публичный запрос. Postman сохраняет JSESSIONID в cookie jar, а тестовый скрипт сохраняет токен в переменную csrfToken."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CSRF token received', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json(); pm.expect(token.headerName).to.eql('X-CSRF-TOKEN'); pm.collectionVariables.set('csrfToken', token.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Зарегистрировать журналиста",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "description": "Публичная регистрация. Роль задаётся сервером как JOURNALIST независимо от тела запроса.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{registrationUsername}}\",\n  \"displayName\": \"Новый корреспондент\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"role\": \"EDITOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = Date.now().toString(); pm.collectionVariables.set('registrationUsername', 'postman_reporter_' + suffix); pm.collectionVariables.set('registrationEmail', 'postman_reporter_' + suffix + '@example.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Registration creates an active journalist', () => pm.response.to.have.status(201));",
+                  "const account = pm.response.json(); pm.expect(account.role).to.eql('JOURNALIST'); pm.expect(account.accountStatus).to.eql('ACTIVE'); pm.collectionVariables.set('registeredUserId', account.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Повторная регистрация с тем же логином отклоняется",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{registrationUsername}}\",\n  \"displayName\": \"Повторная регистрация\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Duplicate account returns 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Регистрация со слабым паролем отклоняется",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/register",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"weak_reporter\",\n  \"displayName\": \"Слабый пароль\",\n  \"email\": \"weak_reporter@example.test\",\n  \"password\": \"weak\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Weak password returns 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Заблокировать зарегистрированную учётную запись",
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{registeredUserId}}/account-status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountStatus\": \"LOCKED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account locked', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().accountStatus).to.eql('LOCKED');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Заблокированный пользователь не может войти",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{registrationUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{registrationPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Locked account returns 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Разблокировать зарегистрированную учётную запись",
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{registeredUserId}}/account-status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountStatus\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Account reactivated', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().accountStatus).to.eql('ACTIVE');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Зарегистрированный пользователь успешно входит после разблокировки",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{registrationUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{registrationPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reactivated journalist can authenticate', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().role).to.eql('JOURNALIST');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Кто я — редактор",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Editor identity', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().role).to.eql('EDITOR');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Кто я — журналист",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{journalistUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{journalistPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/api/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Journalist identity', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().role).to.eql('JOURNALIST');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Журналист не может просматривать список пользователей",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{journalistUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{journalistPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [],
+            "url": "{{baseUrl}}/api/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Role restriction returns 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Журналист создаёт статью от своего имени",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/articles",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{registrationUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{registrationPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectionId\": 2,\n  \"authorId\": {{registeredUserId}},\n  \"title\": \"Статья зарегистрированного журналиста\",\n  \"text\": \"Материал создан в рамках проверки пользовательских полномочий.\",\n  \"status\": \"DRAFT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Journalist can create own article', () => pm.response.to.have.status(201));",
+                  "const article = pm.response.json(); pm.expect(article.authorId).to.eql(Number(pm.collectionVariables.get('registeredUserId'))); pm.collectionVariables.set('registeredArticleId', article.id);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "13 Журналист отправляет собственную статью на проверку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/articles/{{registeredArticleId}}/submit-for-review",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{registrationUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{registrationPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Journalist can submit own article', () => pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json().status).to.eql('IN_REVIEW');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "14 Журналист не может одобрять собственную статью",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/articles/{{registeredArticleId}}/approve",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{registrationUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{registrationPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remarks\": \"Недопустимое действие журналиста\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Journalist approval returns 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 Неаутентифицированный запрос отклоняется",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [],
+            "url": "{{baseUrl}}/api/articles"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing credentials return 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 Запрос на изменение без CSRF-токена отклоняется",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-sections",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\":\"CSRF test without token\",\"publicationAvailable\":true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing CSRF token returns 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 Нельзя повторно опубликовать уже опубликованный выпуск",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/issues/2/publish",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Business state conflict returns 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 — CRUD: рубрики и пользователи",
+      "description": "Создаются основные записи и отдельные временные записи для демонстрации DELETE.",
+      "item": [
+        {
+          "name": "01 Создать основную рубрику",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-sections",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Технологии API\",\n  \"publicationAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Рубрика создана', () => pm.response.to.have.status(201)); pm.collectionVariables.set('sectionId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Создать временную рубрику для DELETE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-sections",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Временная рубрика API\",\n  \"publicationAvailable\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Временная рубрика создана', () => pm.response.to.have.status(201)); pm.collectionVariables.set('deleteSectionId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 GET список рубрик",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/editorial-sections",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET основная рубрика",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/editorial-sections/{{sectionId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 PATCH основную рубрику",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-sections/{{sectionId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Технологии и наука API\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Рубрика обновлена', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().name).to.eql('Технологии и наука API');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 DELETE временную рубрику",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-sections/{{deleteSectionId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Рубрика удалена', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Создать основного пользователя",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"postman_reporter\",\n  \"displayName\": \"Корреспондент Postman\",\n  \"email\": \"postman_reporter@example.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Пользователь создан', () => pm.response.to.have.status(201)); pm.collectionVariables.set('userId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Назначить пароль новому пользователю",
+          "request": {
+            "method": "PATCH",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{userId}}/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Password stored and user activated', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().accountStatus).to.eql('ACTIVE');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Создать временного пользователя для DELETE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"postman_temp_user\",\n  \"displayName\": \"Временный пользователь\",\n  \"email\": \"postman_temp@example.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Временный пользователь создан', () => pm.response.to.have.status(201)); pm.collectionVariables.set('deleteUserId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 GET список пользователей",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 GET основного пользователя",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{userId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 PATCH основного пользователя",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{userId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Корреспондент Postman обновлён\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Пользователь обновлён', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().displayName).to.eql('Корреспондент Postman обновлён');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 DELETE временного пользователя",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{deleteUserId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Пользователь удалён', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — CRUD: статьи, проверки и выпуски",
+      "description": "Полный цикл GET list, GET by ID, POST, PATCH и DELETE по соответствующим ресурсам.",
+      "item": [
+        {
+          "name": "01 Создать статью для основного сценария",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/articles",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectionId\": {{sectionId}},\n  \"authorId\": 2,\n  \"title\": \"Материал для публикации\",\n  \"text\": \"Тестовый материал для воспроизведения полного редакционного процесса.\",\n  \"status\": \"DRAFT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья создана', () => pm.response.to.have.status(201)); pm.collectionVariables.set('articleId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Создать статью для возврата на доработку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/articles",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectionId\": {{sectionId}},\n  \"authorId\": 2,\n  \"title\": \"Материал для доработки\",\n  \"text\": \"Второй тестовый материал для проверки возврата автору.\",\n  \"status\": \"DRAFT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья для доработки создана', () => pm.response.to.have.status(201)); pm.collectionVariables.set('revisionArticleId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Создать временную статью для DELETE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/articles",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectionId\": {{sectionId}},\n  \"authorId\": {{userId}},\n  \"title\": \"Временная статья\",\n  \"text\": \"Статья будет удалена в CRUD-сценарии коллекции.\",\n  \"status\": \"DRAFT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Временная статья создана', () => pm.response.to.have.status(201)); pm.collectionVariables.set('deleteArticleId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET список статей",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/articles",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 GET основную статью",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/articles/{{articleId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 PATCH основную статью",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/articles/{{articleId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Материал для публикации — обновлён\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья обновлена', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().title).to.include('обновлён');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 DELETE временную статью",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/articles/{{deleteArticleId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья удалена', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Создать CRUD-проверку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-reviews",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"articleId\": {{articleId}},\n  \"decision\": \"NEEDS_REVISION\",\n  \"remarks\": \"Проверка CRUD-маршрутов; запись будет удалена до бизнес-сценария.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Проверка создана', () => pm.response.to.have.status(201)); pm.collectionVariables.set('reviewId', pm.response.json().id); pm.expect(pm.response.json().reviewedAt).to.exist;"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 GET список редакторских проверок",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/editorial-reviews",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 GET CRUD-проверку",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/editorial-reviews/{{reviewId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 PATCH CRUD-проверку",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-reviews/{{reviewId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remarks\": \"CRUD-запись обновлена\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Проверка обновлена', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().remarks).to.eql('CRUD-запись обновлена');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 DELETE CRUD-проверку",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/editorial-reviews/{{reviewId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Проверка удалена', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 Создать черновой выпуск для бизнес-сценария",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/edition-issues",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-11-10\",\n  \"articleIds\": [],\n  \"status\": \"DRAFT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Выпуск создан', () => pm.response.to.have.status(201)); pm.collectionVariables.set('issueId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 GET список выпусков",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/edition-issues",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 GET основной выпуск",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/edition-issues/{{issueId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP status is successful', function () { pm.expect(pm.response.code).to.be.within(200, 299); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 PATCH дату основного выпуска",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/edition-issues/{{issueId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-11-11\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Выпуск обновлён', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().date).to.eql('2026-11-11');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 Создать временный выпуск для DELETE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/edition-issues",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2026-11-12\",\n  \"articleIds\": [],\n  \"status\": \"DRAFT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Временный выпуск создан', () => pm.response.to.have.status(201)); pm.collectionVariables.set('deleteIssueId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 DELETE временный выпуск",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/edition-issues/{{deleteIssueId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Выпуск удалён', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — Пять бизнес-операций",
+      "description": "Сценарий проходит от отправки статьи на проверку до публикации выпуска; вторая статья отдельно возвращается на доработку.",
+      "item": [
+        {
+          "name": "01 Отправить основную статью на проверку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/articles/{{articleId}}/submit-for-review",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{journalistUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{journalistPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья перешла в IN_REVIEW', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().status).to.eql('IN_REVIEW');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Одобрить основную статью",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/articles/{{articleId}}/approve",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remarks\": \"Материал проверен. Одобрено для выпуска.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья одобрена, проверка создана', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().article.status).to.eql('APPROVED'); pm.expect(pm.response.json().review.decision).to.eql('APPROVED'); pm.collectionVariables.set('approvalReviewId', pm.response.json().review.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Отправить вторую статью на проверку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/articles/{{revisionArticleId}}/submit-for-review",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{journalistUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{journalistPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Вторая статья перешла в IN_REVIEW', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().status).to.eql('IN_REVIEW');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Вернуть вторую статью на доработку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/articles/{{revisionArticleId}}/request-revision",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remarks\": \"Добавить независимый источник и уточнить дату.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья возвращена в DRAFT', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().article.status).to.eql('DRAFT'); pm.expect(pm.response.json().review.decision).to.eql('NEEDS_REVISION'); pm.collectionVariables.set('revisionReviewId', pm.response.json().review.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Включить одобренную статью в выпуск",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/issues/{{issueId}}/articles/{{articleId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья включена в выпуск', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().articleIds).to.include(Number(pm.collectionVariables.get('articleId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Опубликовать выпуск",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business-operations/issues/{{issueId}}/publish",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Выпуск опубликован', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().status).to.eql('PUBLISHED'); pm.expect(pm.response.json().articleIds.length).to.be.above(0);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Проверить опубликованную статью",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/articles/{{articleId}}",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Статья имеет статус PUBLISHED', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().status).to.eql('PUBLISHED');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Проверить историю проверок",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/editorial-reviews",
+            "description": "",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{editorUsername}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{editorPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Сохранены бизнес-проверки', () => pm.response.to.have.status(200)); pm.expect(pm.response.json().length).to.be.at.least(2);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

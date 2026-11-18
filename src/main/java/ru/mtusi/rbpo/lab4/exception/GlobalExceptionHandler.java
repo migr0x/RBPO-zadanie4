@@ -21,6 +21,12 @@ public class GlobalExceptionHandler {
         this.clock = clock;
     }
 
+    @ExceptionHandler(TokenAuthenticationException.class)
+    public ResponseEntity<ApiError> handleTokenAuthentication(TokenAuthenticationException exception,
+                                                             HttpServletRequest request) {
+        return build(HttpStatus.UNAUTHORIZED, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(ResourceNotFoundException exception,
                                                    HttpServletRequest request) {

@@ -29,7 +29,10 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException exception) throws IOException, ServletException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setHeader("WWW-Authenticate", "Basic realm=\"News Editorial API\"");
+        String authorization = request.getHeader("Authorization");
+        String scheme = authorization != null && authorization.regionMatches(true, 0, "Basic ", 0, 6)
+                ? "Basic" : "Bearer";
+        response.setHeader("WWW-Authenticate", scheme + " realm=\"News Editorial API\"");
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(), new ApiError(
                 Instant.now(clock), 401, "Unauthorized",

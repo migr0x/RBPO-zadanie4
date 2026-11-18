@@ -1,0 +1,1296 @@
+{
+  "info": {
+    "_postman_id": "b17f5915-6fc8-4d9f-b756-05e22697e527",
+    "name": "RBPO — Лабораторная работа №5, вариант 27 — JWT и сессии",
+    "description": "Продолжение работы №4: выдача HS256 access/refresh JWT, обновление пары, повторное использование и регистрация. Выполняйте папки по порядку. Нужен запущенный API и демо-пользователь chief_editor из V3. Состояния ACTIVE/USED/REVOKED дополнительно проверяются SQL из README. Токены сохраняются только в переменные текущего прогона; в файле коллекции их значения пусты.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "editorUsername",
+      "value": "chief_editor",
+      "type": "string"
+    },
+    {
+      "key": "editorPassword",
+      "value": "EditorDemo!2026",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "oldAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "oldRefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "workflowDeviceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationUsername",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registrationPassword",
+      "value": "Registered!Pass2026",
+      "type": "string"
+    },
+    {
+      "key": "registeredAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "registeredRefreshToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Выдача, обновление и повторное использование",
+      "description": "Обязательный сценарий работы №5. После выполнения остаются две строки для workflowDeviceId: REVOKED и ACTIVE. Состояния БД проверяются SQL, HTTP endpoint для просмотра токенов не добавляется.",
+      "item": [
+        {
+          "name": "01. Вход: выдать пару и создать ACTIVE-сессию",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "После запроса в user_sessions должна появиться одна ACTIVE-строка с device_id из workflowDeviceId. Для пошаговой проверки остановитесь здесь и выполните SQL из README.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{editorUsername}}\",\n  \"password\": \"{{editorPassword}}\",\n  \"deviceId\": \"{{workflowDeviceId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = pm.variables.replaceIn(\"{{$guid}}\");",
+                  "pm.collectionVariables.set(\"workflowDeviceId\", \"postman-lab5-\" + suffix);",
+                  "[\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\"].forEach(function (key) { pm.collectionVariables.set(key, \"\"); });",
+                  "console.info(\"Lab5 workflowDeviceId: \" + pm.collectionVariables.get(\"workflowDeviceId\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Ответ содержит только accessToken и refreshToken\", function () {",
+                  "    pm.expect(Object.keys(pm.response.json()).sort()).to.eql([\"accessToken\", \"refreshToken\"]);",
+                  "});",
+                  "pm.test(\"Оба токена имеют формат JWT и отличаются\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const jwtPattern = /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/;",
+                  "    pm.expect(body.accessToken).to.be.a(\"string\").and.match(jwtPattern);",
+                  "    pm.expect(body.refreshToken).to.be.a(\"string\").and.match(jwtPattern);",
+                  "    pm.expect(body.accessToken).not.to.eql(body.refreshToken);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", body.refreshToken);",
+                  "}",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"oldAccessToken\", body.accessToken);",
+                  "    pm.collectionVariables.set(\"oldRefreshToken\", body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Доступ с первым access",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Доступ выдан редактору\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.username).to.eql(pm.variables.get(\"editorUsername\"));",
+                  "    pm.expect(body.role).to.eql(\"EDITOR\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Обмен refresh: USED и новая ACTIVE",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer deliberately-invalid-access"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "Endpoint не требует access. Передан заведомо неверный Bearer, чтобы проверить независимость обновления от access. После ответа старая строка должна стать USED, новая — ACTIVE, с тем же device_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Ответ содержит только accessToken и refreshToken\", function () {",
+                  "    pm.expect(Object.keys(pm.response.json()).sort()).to.eql([\"accessToken\", \"refreshToken\"]);",
+                  "});",
+                  "pm.test(\"Оба токена имеют формат JWT и отличаются\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const jwtPattern = /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/;",
+                  "    pm.expect(body.accessToken).to.be.a(\"string\").and.match(jwtPattern);",
+                  "    pm.expect(body.refreshToken).to.be.a(\"string\").and.match(jwtPattern);",
+                  "    pm.expect(body.accessToken).not.to.eql(body.refreshToken);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", body.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", body.refreshToken);",
+                  "}",
+                  "pm.test(\"Новая пара отличается от прежней\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.accessToken).not.to.eql(pm.collectionVariables.get(\"oldAccessToken\"));",
+                  "    pm.expect(body.refreshToken).not.to.eql(pm.collectionVariables.get(\"oldRefreshToken\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Доступ с новым access",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Повтор старого refresh: отказ и REVOKED",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "Ожидаются 401 и фиксация USED -> REVOKED. Дополнительная пара и строка не создаются. После этого запроса SQL должен показывать две строки: REVOKED и ACTIVE.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{oldRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06. Повтор отозванного refresh: отказ",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{oldRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07. Новый access действует после повтора старого refresh",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. Неверные данные и типы токенов",
+      "description": "Запускается после папки 01, использует её актуальную пару. Не должен создавать новые сессии или менять ACTIVE-сессию.",
+      "item": [
+        {
+          "name": "01. Неверный пароль",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{editorUsername}}\",\n  \"password\": \"wrong-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Пустой пароль",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{editorUsername}}\",\n  \"password\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Отсутствует username",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"{{editorPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Пустой refreshToken",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Отсутствует refreshToken",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06. Неверный JSON",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refreshToken\":",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07. Некорректный JWT",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"not-a-jwt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08. Access передан вместо refresh",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{accessToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09. Refresh передан как Bearer-access",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{refreshToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Подменена подпись refresh",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{tamperedRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const parts = pm.collectionVariables.get(\"refreshToken\").split(\".\");",
+                  "parts[2] = (parts[2].charAt(0) === \"A\" ? \"B\" : \"A\") + parts[2].substring(1);",
+                  "pm.variables.set(\"tamperedRefreshToken\", parts.join(\".\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Защищённый запрос без аутентификации",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03. Регистрация и сохранение ограничений работы 4",
+      "item": [
+        {
+          "name": "01. Регистрация сразу выдаёт пару",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{registrationUsername}}\",\n  \"displayName\": \"Postman Lab5 Reporter\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"deviceId\": \"postman-lab5-registration\",\n  \"role\": \"EDITOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = pm.variables.replaceIn(\"{{$guid}}\").replace(/-/g, \"\");",
+                  "pm.collectionVariables.set(\"registrationUsername\", \"lab5_\" + suffix);",
+                  "pm.collectionVariables.set(\"registrationEmail\", \"lab5_\" + suffix + \"@example.test\");",
+                  "pm.collectionVariables.set(\"registeredAccessToken\", \"\");",
+                  "pm.collectionVariables.set(\"registeredRefreshToken\", \"\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Ответ содержит только accessToken и refreshToken\", function () {",
+                  "    pm.expect(Object.keys(pm.response.json()).sort()).to.eql([\"accessToken\", \"refreshToken\"]);",
+                  "});",
+                  "pm.test(\"Оба токена имеют формат JWT и отличаются\", function () {",
+                  "    const body = pm.response.json();",
+                  "    const jwtPattern = /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/;",
+                  "    pm.expect(body.accessToken).to.be.a(\"string\").and.match(jwtPattern);",
+                  "    pm.expect(body.refreshToken).to.be.a(\"string\").and.match(jwtPattern);",
+                  "    pm.expect(body.accessToken).not.to.eql(body.refreshToken);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set(\"registeredAccessToken\", body.accessToken);",
+                  "    pm.collectionVariables.set(\"registeredRefreshToken\", body.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Запрошенная роль EDITOR не назначена",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{registeredAccessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/auth/me",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"Новый пользователь имеет JOURNALIST и ACTIVE\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.username).to.eql(pm.variables.get(\"registrationUsername\"));",
+                  "    pm.expect(body.role).to.eql(\"JOURNALIST\");",
+                  "    pm.expect(body.accountStatus).to.eql(\"ACTIVE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Повторная регистрация: конфликт",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{registrationUsername}}\",\n  \"displayName\": \"Postman Lab5 Reporter\",\n  \"email\": \"{{registrationEmail}}\",\n  \"password\": \"{{registrationPassword}}\",\n  \"deviceId\": \"postman-lab5-registration\",\n  \"role\": \"EDITOR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.response.to.have.status(409); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Слабый пароль",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{registrationUsername}}_weak\",\n  \"displayName\": \"Weak Password Reporter\",\n  \"email\": \"weak_{{registrationEmail}}\",\n  \"password\": \"weakpassword2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Пустой email",
+          "request": {
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/register",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{registrationUsername}}_blank\",\n  \"displayName\": \"Blank Email Reporter\",\n  \"email\": \" \",\n  \"password\": \"{{registrationPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "pm.test(\"Ошибка имеет JSON-формат\", function () { pm.response.to.be.json; });",
+                  "pm.test(\"При отказе новая пара не выдана\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).not.to.have.property(\"accessToken\");",
+                  "    pm.expect(body).not.to.have.property(\"refreshToken\");",
+                  "});",
+                  "pm.test(\"Ответ не раскрывает выданные токены\", function () {",
+                  "    const body = pm.response.text();",
+                  "    [\"accessToken\", \"refreshToken\", \"oldAccessToken\", \"oldRefreshToken\", \"registeredAccessToken\", \"registeredRefreshToken\"].forEach(function (key) {",
+                  "        const value = pm.collectionVariables.get(key);",
+                  "        if (value) pm.expect(body).not.to.include(value);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

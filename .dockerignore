@@ -5,3 +5,8 @@
 target
 *.iml
 *.log
+tls/local
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.key

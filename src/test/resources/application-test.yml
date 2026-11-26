@@ -20,3 +20,8 @@ security:
     secret: test-only-jwt-secret-with-at-least-32-bytes-2026
     access-ttl: PT15M
     refresh-ttl: P7D
+
+server:
+  ssl:
+    enabled: false
+    key-store-password: unused-in-mockmvc

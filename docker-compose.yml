@@ -1,18 +1,15 @@
+name: rbpo-lab6
+
 services:
   db:
     image: postgres:16-alpine
-    container_name: rbpo-lab4-db
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       APP_DB_USERNAME: ${APP_DB_USERNAME}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/init/10-create-app-user.sh:/docker-entrypoint-initdb.d/10-create-app-user.sh:ro
@@ -24,18 +21,22 @@ services:
 
   api:
     build: .
-    container_name: rbpo-lab4-api
     restart: unless-stopped
     environment:
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       DB_USERNAME: ${APP_DB_USERNAME}
       DB_PASSWORD: ${APP_DB_PASSWORD}
-      SERVER_PORT: 8080
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 8443
+      TLS_KEYSTORE: file:/run/tls/lab6-server.p12
+      TLS_KEYSTORE_PASSWORD: ${TLS_KEYSTORE_PASSWORD:?Set TLS_KEYSTORE_PASSWORD in .env}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-PT15M}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-P7D}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${SERVER_PORT:-8443}:8443"
+    volumes:
+      - ./tls/local/lab6-server.p12:/run/tls/lab6-server.p12:ro
     depends_on:
       db:
         condition: service_healthy

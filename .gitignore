@@ -7,3 +7,8 @@ target/
 Thumbs.db
 .env
 *.log
+/tls/local/
+*.p12
+*.pfx
+*.jks
+*.key
